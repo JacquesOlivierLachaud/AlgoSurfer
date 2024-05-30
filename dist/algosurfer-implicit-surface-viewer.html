@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>AlgoSurfer</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link type="text/css" rel="stylesheet" href="main.css">
+  </head>
+
+    <!--
+AlgoSurfer, (c) 2024 by Jacques-Olivier Lachaud, v1.0
+
+As part of a pedagogical project, do not expect clean javascript code. The focus was on displaying implicit surfaces with a massive use of GPU computations. 
+    -->
+    
+    <body>
+    <style>
+textarea {
+  padding: 2px 2px;
+  box-sizing: border-box;
+  border: 2px solid #808080;
+  border-radius: 4px;
+  color: #eeeeee;
+  background-color: #111111;
+  font-size: 12px;
+  resize: both;
+}
+button {
+  padding: 2px 2px;
+  box-sizing: border-box;
+  border: 2px solid #808080;
+  border-radius: 4px;
+  color: #ff88dd;
+  background-color: #111111;
+  font-size: 14px;
+  vertical-align: top;
+}
+    </style>
+
+    <div id="info"> AlgoSurfer - an implicit surface viewer, by <a href="https://jacquesolivierlachaud.github.io" target="_blank" rel="noopener">J.-O. Lachaud</a>, fps: <span id="fps"></span></div>
+    <div id="update-fct">
+      <table>
+	<tr>
+	  <td><table>
+	      <tr>
+		<td><button type="button" onclick="displayInfo()">Help</button></td>
+		<td><button type="button" onclick="updateRenderer()">View surface</button></td>
+	      </tr>
+	      <tr>
+		<td></td>
+		<td><button type="button" onclick="clearFunction()">Restart</button></td>
+	      </tr>
+	  </table></td>
+	  <td><textarea spellcheck="false" rows="4" cols="60" id="editable-code-fct">
+      // Computes f(x,y,z). You may use x2 for x*x, x3 for x*x*x,
+      // same holds for y and z. Constant must be floating numbers.
+      // Durckblick + ball
+      return ( x2 + y2 + z2 - a*a ) * ( x3 * y + x * z3 + y3 * z + 5. * z );
+	  </textarea></td>
+	  <td><textarea spellcheck="false" rows="4" cols="60" id="editable-code-fct_error" style="color: #88ff88;" readonly>
+	  </textarea></td>
+	</tr>
+      </table>
+    </div>
+    <div><canvas id="webglcanvas" style="border: none; background-color:#000000" width="800" height="500"></canvas></div>
+    
+    <script type="importmap">
+      {
+	  "imports": {
+	      "three": "./three.module.js",
+	      "three/addons/": "./jsm/",
+	      "three/addons/controls/": "./examples/jsm/controls/",
+	      "three/addons/effects/": "./examples/jsm/effects/"
+	  }
+      }
+</script>
+
+    <!--
+Contains the glsl code for functions used in the fragment shader,
+as well as their properties.
+    -->
+    <iframe id="imported-functions" title="function code definitions" src="./chunk-functions.html" width="0" height="0" style="border: none; background-color:#000000"></iframe>
+
+    <!--
+Contains the glsl code for the vertex and fragment shaders.
+    -->
+    <iframe id="imported-shaders" title="shaders code definitions" src="./chunk-shaders-reorg.html" width="0" height="0" style="border: none; background-color:#000000"></iframe>
+
+    <!--
+Contains the help text.
+    <object type="text/html" id="helper"   data="./chunk-info.html"></object>
+    -->
+    <iframe id="imported-helper" title="helper text" src="./chunk-info.html" width="0" height="0" style="border: none; background-color:#000000"></iframe>
+
+
+    <script type="module">
+///////////////////////////////////////////////////////////////////////////////
+// Main script
+///////////////////////////////////////////////////////////////////////////////
+import * as THREE from 'three';
+import { GUI } from 'three/addons/lil-gui.module.min.js';
+import { OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import { AnaglyphEffect } from 'three/addons/effects/AnaglyphEffect.js';
+
+///////////////////////////////////////////////////////////////////////////////
+// Build predefined shapes
+var shapeRE      = /^shape/;
+var shape_models = [];
+var functions     = document.querySelector( '#imported-functions' ); // in <object> tag
+var doc_functions = functions.contentDocument;
+var shaders       = document.querySelector( '#imported-shaders' ); // in <object> tag
+var doc_shaders   = shaders.contentDocument;
+console.log( doc_shaders );
+var helper        = document.querySelector( '#imported-helper' ); // in <object> tag
+var doc_helper    = helper.contentDocument;
+var els           = doc_functions.getElementsByTagName('*');
+//var els          = document.getElementsByTagName('*');
+let idx           = 0;
+for (var e in els) {
+    if ( shapeRE.test( els[ e ].id ) ) {
+	let shape = JSON.parse( doc_functions.getElementById( els[ e ].id ).value );
+	shape.id  = idx;
+	idx      += 1;
+	shape_models.push( shape );
+	// console.log( shape );
+    }
+}
+///////////////////////////////////////////////////////////////////////////////
+// const color_model_names = [
+//     "RGB normals", "Phong", "RGB normals + grid", "Phong + grid",
+//     "RGB normals + spheres", "Phong + spheres", "Phong + transparency",
+//     "Phong (1 light)", "Mean curvatures", "Gaussian curv.",
+//     "Convex/Concave", "Directions", "Phong + reflections"
+// ];
+const color_model_names = [
+    "Basic", "Phong", "Phong + lights"
+];
+const display_mode_names = [
+    "Surface", "Normals", "Mean curv.", "Gaussian curv.",
+    "Convex/Concave", "Princ. dir."
+];
+const grid_mode_names = [
+    "None", "Grid (XYZ)", "Grid (Spheres)", "Isolines"
+];
+
+///////////////////////////////////////////////////////////////////////////////
+      // Build settings
+      let effect;
+let camera, scene, renderer, object;
+let distance = 200.0;
+let map;
+let shader;
+let settings = {
+    width         : 500,
+    height        : 500,
+    bg_mode       : 0,
+    bg_color      : [ 0.1, 0.1, 0.1 ],
+    ambient_color : [ 0.01, 0.0, 0.0 ],
+    ext_diff_color: [ 1.0, 0.25, 0.1 ],
+    int_diff_color: [ 0.25, 0.8, 1.0 ],
+    specular_color: [ 1.0, 1.0, 1.0 ],
+    sing_color    : [ 1.0, 1.0, 1.0 ],	  
+    shininess     : 10.0,
+    opacity       : 0.6,
+    transparency  : 0.0,
+    reflection    : 0.0,
+    curv_scale    : 1.0,
+    princ_curv    : 0,
+    light1        : 1,
+    light1_color  : [ 0.95, 0.8, 0.0 ],
+    light2        : 0,
+    light2_color  : [ 0.1, 0.1, 1.0 ],
+    singularity   : 0.6,
+    accuracy      : 5.0,
+    scale         : 10.0,
+    shape         : 0,
+    iso           : 0.0,
+    a             : 1.0,
+    b             : 1.0,
+    c             : 1.0,
+    center_x      : 0.0,
+    center_y      : 0.0,
+    center_z      : 0.0, 	  	  
+    display_mode  : 0,
+    color_model   : 1,
+    grid_mode     : 0,
+    view_shape    : 0,
+    view_radius   : 100.0,
+    grid_size     : 1.0,
+    grid_thickness: 0.1,
+    grid_attenuation: 0.5,	  	  
+    rotation_x    : 0.0,
+    rotation_y    : 0.0,
+    rotation_z    : 0.0,
+    stop          : function() {
+	settings.rotation_x = 0;
+	settings.rotation_y = 0;
+	settings.rotation_z = 0;
+    },
+    camera_distance : 200.0,
+    anaglyph      : 0,
+    eye_sep       : 0.15,
+    time          : 0.0,
+    nb_bissections: 8,
+    nb_reflections: 3,
+    nb_refractions: 3,    
+    interior_index: 1.1,
+    dir_color_on  : [1.0,1.0,1.0],
+    dir_on_opacity: 1.0,
+    dir_color_off : [0.0,0.0,0.0],
+    dir_off_opacity: 1.0
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// Read parameters given to the page
+const nbshapes = shape_models.length;
+console.log( "Found " + nbshapes + " different shapes" );
+if ( location.search != "" ) {
+    var parameters = location.search.substring(1).split("&");
+    for ( var p in parameters ) {
+	var node  = parameters[ p ].split("=");
+	var key   = node[ 0 ];
+	var value = node[ 1 ];
+	console.log( key + " : " + value );
+	if ( key === "shape" ) {
+	    var n = parseInt( unescape( value ) );
+	    if ( n >= 0 && n < nbshapes ) settings.shape = n;
+	} else if ( key === "cmodel" ) {
+	    var n = parseInt( unescape( value ) );
+	    settings.color_model = n;
+	} else if ( key === "dmode" ) {
+	    var n = parseInt( unescape( value ) );
+	    settings.display_mode = n;
+	} else if ( key === "scale" ) {
+	    var n = parseFloat( unescape( value ) );
+	    settings.scale = n;
+	} else if ( key === "a" ) {
+	    var n = parseFloat( unescape( value ) );
+	    settings.a = n;
+	} else if ( key === "b" ) {
+	    var n = parseFloat( unescape( value ) );
+	    settings.b = n;
+	} else if ( key === "c" ) {
+	    var n = parseFloat( unescape( value ) );
+	    settings.c = n;
+	} else if ( key === "bg_mode" ) {
+	    var n = parseInt( unescape( value ) );
+	    settings.bg_mode = n;
+	} else if ( key === "tra" ) {
+	    var n = parseFloat( unescape( value ) );
+	    settings.transparency = n;
+	} else if ( key === "ref" ) {
+	    var n = parseFloat( unescape( value ) );
+	    settings.reflection = n;
+	}
+    }    
+}
+console.log( "Chosen shape is " + settings.shape );
+
+///////////////////////////////////////////////////////////////////////////////
+// debug
+// settings.color_model = 11;
+// // durchblick
+// settings.shape       = 0;
+// settings.grid_size   = 0.2;
+// // settings.a           = 1.0;
+// // settings.b           = 0.5;
+// // settings.c           = -1.0;
+// // // torus
+// // settings.shape       = 12;
+// // settings.a           = 1.0;
+// // settings.b           = 0.5;
+// // settings.c           = -1.0;
+// // goursat
+// // settings.shape       = 19;
+// // settings.a           = -0.225;
+// // settings.b           = -0.025;
+// // settings.c           = -1.65;
+// settings.scale       = 25.0;
+// settings.curv_scale  = 5.0;
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+///////////////////////////////////////////////////////////////////////////////
+// Init main loop
+let   canvas;
+let   controls;
+var   uniforms;
+let   then     = 0;
+let   textureCube;
+const fpsElem  = document.querySelector("#fps");
+// run everything
+init();
+animate();
+initGui();
+displayInfo();
+// set up callbacks
+window.updateRenderer = updateRenderer;
+window.clearFunction  = clearFunction;
+window.displayInfo    = displayInfo;
+///////////////////////////////////////////////////////////////////////////////
+
+
+// Changes the geometry of the viewing "window".
+function makeViewShape( value, radius ) {
+    if ( value == 0 )
+	object.geometry = new THREE.BoxGeometry( radius, radius, radius );
+    if ( value == 1 )
+	object.geometry = new THREE.DodecahedronGeometry( radius, 0 );
+    if ( value == 2 )
+	object.geometry = new THREE.IcosahedronGeometry( radius, 0 );
+    if ( value == 3 )
+	object.geometry = new THREE.IcosahedronGeometry( radius, 4 );
+    if ( value == 4 )
+	object.geometry = new THREE.SphereGeometry( radius, 32, 16 );
+    if ( value == 5 )
+	object.geometry = new THREE.CylinderGeometry( 0.5*radius, 0.5*radius, radius,
+						      32 );
+    if ( value == 6 ) {
+	object.geometry = new THREE.BoxGeometry( 0.5*radius, radius, radius );
+	object.geometry.translate( -0.25*radius, 0.0, 0.0 );
+    }
+    if ( value == 7 ) {
+	object.geometry = new THREE.BoxGeometry( 0.01*radius, radius, radius );
+    }
+    uniforms.view_radius.value = radius;
+}
+
+// @return the fragment shader code for the predefined function `value`
+function makeFunctionShader( value ) {
+    var code = "";
+    console.log( value );
+    console.log( shape_models[ value ]);
+    if ( "frag" in shape_models[ value ] ) {
+	var str = "frag-chunk-fct-"+shape_models[ value ].frag;
+	code    = doc_functions.getElementById( str ).value;
+    } else {
+	console.log( "No frag in "+shape_models[ value ] );
+    }
+    return code;
+}
+
+// Changes the predefined shape function.
+function updateShape( value ) {
+    let chunk_code = makeFunctionShader( value );
+    if ( chunk_code !== "" )
+	document.getElementById("editable-code-fct").value = chunk_code;
+    updateRenderer();
+}
+
+// Update the fragment shader from the different chunks.
+function updateShader() {
+    // Build fragment shader from chunks
+    var doc     = doc_shaders;
+    var fragSrc = '#define GRID_MODE '+ settings.grid_mode + '\n';
+    fragSrc += doc.getElementById("frag-chunk-begin").value
+	+ doc.getElementById("frag-chunk-fct-begin").value
+	+ document.getElementById("editable-code-fct").value
+	+ doc.getElementById("frag-chunk-fct-end").value
+	+ doc.getElementById("frag-chunk-gradf").value
+	+ doc.getElementById("frag-chunk-raytrace").value
+	+ doc.getElementById("frag-chunk-bg-color").value
+	+ doc.getElementById("frag-chunk-phong").value;
+    switch ( settings.color_model ) {
+    case 0: fragSrc += doc.getElementById("frag-chunk-illumination-basic").value;
+	break;
+    case 1: fragSrc += doc.getElementById("frag-chunk-illumination-phong").value;
+	break;
+    case 2: fragSrc += doc.getElementById("frag-chunk-illumination-phong-lights").value;
+	break;
+    }
+    switch ( settings.display_mode ) {
+    case 0: fragSrc += doc.getElementById("frag-chunk-display-surface").value;
+	break;
+    case 1: fragSrc += doc.getElementById("frag-chunk-display-normals").value;
+	break;
+    case 2: fragSrc += doc.getElementById("frag-chunk-hessf").value
+	+ doc.getElementById("frag-chunk-curvatures").value
+	+ doc.getElementById("frag-chunk-display-mean-curvatures").value;
+	break;
+    case 3: fragSrc += doc.getElementById("frag-chunk-hessf").value
+	+ doc.getElementById("frag-chunk-curvatures").value
+	+ doc.getElementById("frag-chunk-display-gauss-curvatures").value;
+	break;
+    case 4: fragSrc += doc.getElementById("frag-chunk-hessf").value
+	+ doc.getElementById("frag-chunk-curvatures").value
+	+ doc.getElementById("frag-chunk-display-convex-concave").value;
+	break;
+    case 5: fragSrc += doc.getElementById("frag-chunk-hessf").value
+	+ doc.getElementById("frag-chunk-curvatures").value
+	+ doc.getElementById("frag-chunk-eigendecomposition").value
+	+ doc.getElementById("frag-chunk-principal-dirs").value
+	+ doc.getElementById("frag-chunk-display-directions").value;
+	break;
+    }
+    fragSrc += doc.getElementById("frag-chunk-singularity").value
+	+ doc.getElementById("frag-chunk-fog").value
+        + doc.getElementById("frag-chunk-main-common-begin").value
+	+ doc.getElementById("frag-chunk-main-common-end").value;    
+
+    //console.log( fragSrc );
+    shader = new THREE.ShaderMaterial( {
+	vertexShader: doc.querySelector( '#post-vert' ).textContent.trim(),
+	fragmentShader: fragSrc, // document.querySelector( '#post-frag' ).textContent.trim(),
+	uniforms: uniforms
+    } );
+    shader.glslVersion = THREE.GLSL3;
+    shader.side        = THREE.DoubleSide;
+}
+
+// Update the renderer (here, only the material/shader of the viewing object).
+export function updateRenderer() {
+    document.getElementById("editable-code-fct_error").value = "";
+    updateShader();
+    object.material             = shader;
+    object.material.needsUpdate = true;
+}
+export function clearFunction() {
+    settings.a   = 1.0;
+    settings.b   = 1.0;
+    settings.c   = 1.0;
+    settings.iso = 0.0;
+    settings.color_model = 2;
+    shader.uniforms.color_model.value = settings.color_model;
+    settings.shape = 0;
+    updateShape( settings.shape );
+    displayInfo();
+}
+export function displayInfo() {
+    document.getElementById("editable-code-fct_error").value
+	= doc_helper.getElementById("display-info").value;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Init gui
+function initGui() {
+    const gui   = new GUI();
+    let shape_menu = {};
+    for ( var s in shape_models ) 
+	shape_menu[ shape_models[ s ].name ] = shape_models[ s ].id;
+    gui.add( settings, 'shape', shape_menu )
+	.name( "Predefined shape" ).listen().onChange(
+	    function ( value ) {
+		updateShape( value );
+		shader.uniforms.shape.value = value;
+	    } );
+    gui.add( settings, 'display_mode', makeMenu( display_mode_names ) )
+        .name( 'display' )
+	.listen().onChange(
+	    function ( value ) {
+		shader.uniforms.display_mode.value = value;
+		updateRenderer();
+	    } );
+    const shape = gui.addFolder( 'Shape' );
+    shape.open( false );
+    shape.add( settings, 'a' ).min( -2.0 ).max( 2.0 ).step(0.025).listen().onChange(
+	function ( value ) {
+	    shader.uniforms.a.value = value;
+	} );
+    shape.add( settings, 'b' ).min( -2.0 ).max( 2.0 ).step(0.025).listen().onChange(
+	function ( value ) {
+	    shader.uniforms.b.value = value;
+	} );
+    shape.add( settings, 'c' ).min( -2.0 ).max( 2.0 ).step(0.025).listen().onChange(
+	function ( value ) {
+	    shader.uniforms.c.value = value;
+	} );
+    shape.add( settings, 'iso' ).name("isolevel")
+	.min( -1.0 ).max( 1.0 ).step(0.025).listen().onChange(
+	    function ( value ) {
+		shader.uniforms.iso.value = value;
+	    } );
+    shape.add( settings, 'scale' ).min( 1.0 ).max( 100.0 ).onChange(
+	function ( value ) {
+	    shader.uniforms.scale.value = value;
+	} );
+    shape.add( settings, 'center_x' ).min( -5.0 ).max( 5.0 ).step(0.025).onChange(
+        function ( value ) { shader.uniforms.center_x.value = value; } );
+    shape.add( settings, 'center_y' ).min( -5.0 ).max( 5.0 ).step(0.025).onChange(
+        function ( value ) { shader.uniforms.center_y.value = value; } );
+    shape.add( settings, 'center_z' ).min( -5.0 ).max( 5.0 ).step(0.025).onChange(
+        function ( value ) { shader.uniforms.center_z.value = value; } );
+    shape.add( settings, 'rotation_x' ).min( -1.0 ).max( 1.0 ).listen().onChange
+    ( function( value ) { settings.rotation_x = value; } );
+    shape.add( settings, 'rotation_y' ).min( -1.0 ).max( 1.0 ).listen().onChange
+    ( function( value ) { settings.rotation_y = value; } );
+    shape.add( settings, 'rotation_z' ).min( -1.0 ).max( 1.0 ).listen().onChange
+    ( function( value ) { settings.rotation_z = value; } );
+    shape.add( settings, 'stop' );
+
+    const computation = gui.addFolder( 'Computation' );
+    computation.open( false );
+    computation.add( settings, 'accuracy' ).min( 0.2 ).max( 20. ).step(0.1).onChange(
+	function ( value ) {
+	    shader.uniforms.accuracy.value = value;
+	} );
+    computation.add( settings, 'nb_bissections', 5, 15, 1 ).onChange(
+	function ( value ) {
+	    shader.uniforms.nb_bissections.value = value;
+	} );
+    computation.add( settings, 'nb_reflections', 1, 8, 1 ).onChange(
+	function ( value ) {
+	    shader.uniforms.nb_reflections.value = value;
+	} );
+    computation.add( settings, 'nb_refractions', 1, 8, 1 ).onChange(
+	function ( value ) {
+	    shader.uniforms.nb_refractions.value = value;
+	} );
+
+    const colors = gui.addFolder( 'Display settings' );
+    colors.open( false );
+    // let color_model_menu = {};
+    // for ( var i = 0; i < color_model_names.length; i++ )
+    // 	color_model_menu[ color_model_names[ i ] ] = i;
+    colors.add( settings, 'color_model', makeMenu( color_model_names ) )
+	.name( 'illumination' )
+	.listen().onChange(
+	    function ( value ) {
+		shader.uniforms.color_model.value = value;
+		updateRenderer();
+	    } );
+    colors.add( settings, 'bg_mode', {
+	'Background color' : 0, 'Sky (light)' : 1, 'Sky (grid)' : 2,
+	'Sky (image)' : 3
+    } ).name( 'background' ).onChange
+    ( function ( value ) {
+	shader.uniforms.bg_mode.value = value;
+	if ( value < 3 ) scene.background = null;
+	else scene.background = textureCube;
+	scene.needsUpdate = true;
+    } );
+    colors.addColor( settings, 'bg_color' ).onChange
+    ( function ( value ) { shader.uniforms.bg_color.value = value; } );
+    colors.addColor( settings, 'ambient_color' ).onChange
+    ( function ( value ) { shader.uniforms.ambient_color.value = value; } );
+    colors.addColor( settings, 'ext_diff_color' ).onChange
+    ( function ( value ) { shader.uniforms.ext_diff_color.value = value; } );
+    colors.addColor( settings, 'int_diff_color' ).onChange
+    ( function ( value ) { shader.uniforms.int_diff_color.value = value; } );
+    colors.addColor( settings, 'specular_color' ).onChange
+    ( function ( value ) { shader.uniforms.specular_color.value = value; } );
+    colors.add( settings, 'shininess' ).min( 0. ).max( 100. ).onChange
+    ( function ( value ) { shader.uniforms.shininess.value = value; } );
+    colors.add( settings, 'reflection' ).min( 0.0 ).max( 0.95 ).onChange
+    ( function ( value ) { shader.uniforms.reflection.value = value; } );
+    colors.add( settings, 'transparency' ).min( 0.0 ).max( 0.95 ).onChange
+    ( function ( value ) { shader.uniforms.transparency.value = value; } );
+    // colors.add( settings, 'opacity' ).min( 0.05 ).max( 1.0 ).onChange
+    // ( function ( value ) { shader.uniforms.opacity.value = value; } );
+    colors.add( settings, 'interior_index' ).min( 1.0 ).max( 1.5 ).onChange
+    ( function ( value ) { shader.uniforms.interior_index.value = value; } );
+    const curvatures =  gui.addFolder( 'Geometry settings' );
+    curvatures.open( false );
+    curvatures.add( settings, 'princ_curv', { 'first' : 0, 'second' : 1, 'both' : 2 } )
+	.name( 'princ. directions' )
+	.onChange( function ( value ) { shader.uniforms.princ_curv.value = value; } );
+    curvatures.add( settings, 'curv_scale' ).min( 0.01 ).max( 10.0 ).onChange
+    ( function ( value ) { shader.uniforms.curv_scale.value = value; } );
+    curvatures.addColor( settings, 'dir_color_on' ).onChange
+    ( function ( value ) { shader.uniforms.dir_color_on.value = value; } );
+    curvatures.add( settings, 'dir_on_opacity' ).min( 0.0 ).max( 1.0 ).onChange
+    ( function ( value ) { shader.uniforms.dir_on_opacity.value = value; } );
+    curvatures.addColor( settings, 'dir_color_off' ).onChange
+    ( function ( value ) { shader.uniforms.dir_color_off.value = value; } );
+    curvatures.add( settings, 'dir_off_opacity' ).min( 0.0 ).max( 1.0 ).onChange
+    ( function ( value ) { shader.uniforms.dir_off_opacity.value = value; } );
+    curvatures.add( settings, 'singularity' ).min( 0.01 ).max( 1.0 ).step(0.01).onChange(
+	function ( value ) {
+	    shader.uniforms.singularity.value = Math.pow(2.0, -1./value);
+	} );
+    curvatures.addColor( settings, 'sing_color' ).name('singularity_color').onChange
+    ( function ( value ) { shader.uniforms.sing_color.value = value; } );
+    
+    const lights = gui.addFolder( 'Lights' );
+    lights.open( false );
+    lights.add( settings, 'light1', { 'X' : 0, 'Y' : 1, 'Z' : 2,
+				      '-X': 3, '-Y': 4, '-Z': 5,
+				      'X+Y-Z': 6, '-X-Y+Z': 7 } ).onChange
+    ( function( value ) {
+	shader.uniforms.light1_direction.value = makeLight( value );
+    } );
+    lights.addColor( settings, 'light1_color' ).onChange
+    ( function ( value ) { shader.uniforms.light1_color.value = value; } );
+    lights.add( settings, 'light2', { 'X' : 0, 'Y' : 1, 'Z' : 2,
+				      '-X': 3, '-Y': 4, '-Z': 5,
+				      'X+Y-Z': 6, '-X-Y+Z': 7 } ).onChange
+    ( function( value ) {
+	shader.uniforms.light2_direction.value = makeLight( value );
+    } );
+    lights.addColor( settings, 'light2_color' ).onChange
+    ( function ( value ) { shader.uniforms.light2_color.value = value; } );
+    const view = gui.addFolder( 'View' );
+    view.open( false );
+    view.add( settings, 'view_shape',
+	      { 'Cube': 0, 'Dodecahedron': 1,
+		'Icosahedron': 2, 'SubIcosahedron' : 3, 'Sphere': 4,
+		'Cylinder': 5, 'Half-Cube': 6, 'Plane': 7 } )
+	.name( 'view shape' )
+	.onChange
+    ( function( value ) { makeViewShape( value, settings.view_radius ) } );
+    view.add( settings, 'anaglyph', { 'Perspective': 0, 'Anaglyph': 1 } )
+	.name( "camera" );
+    view.add( settings, 'grid_mode', makeMenu( grid_mode_names ) )
+        .name( 'grid' )
+        .listen().onChange(
+            function ( value ) {
+                shader.uniforms.grid_mode.value = value;
+                updateRenderer();
+            } );
+    view.add( settings, 'eye_sep' ).name( "eye separation" )
+	.min( 0.01 ).max( 0.3 );
+    view.add( settings, 'view_radius' ).min( 50.0 ).max( 200.0 ).onChange
+    ( function ( value ) { makeViewShape( settings.view_shape, value ) } );
+    view.add( settings, 'grid_size' ).min( 0.1 ).max( 1.0 ).onChange
+    ( function ( value ) {
+	shader.uniforms.grid_size.value = 10.0*Math.pow(2.0, -1./value); } );
+    view.add( settings, 'grid_thickness' ).min( 0.00 ).max( 1.0 ).onChange
+    ( function ( value ) { shader.uniforms.grid_thickness.value = value; } );
+    view.add( settings, 'grid_attenuation' ).min( 0.0 ).max( 2.0 ).onChange
+    ( function ( value ) { shader.uniforms.grid_attenuation.value = value; } );
+}
+
+function init() {
+    let canvas_name = "webglcanvas";
+    canvas = document.getElementById( canvas_name );
+    canvas.width  = window.innerWidth;
+    canvas.height = canvas.width * 9 / 16;
+    // camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 2000 );
+    renderer = new THREE.WebGLRenderer( { canvas : canvas, antialias: true } );
+    renderer.setSize( canvas.width, canvas.height ); // Set viewport size
+    //renderer.setPixelRatio( window.devicePixelRatio );
+    //renderer.setSize( window.innerWidth, window.innerHeight );
+    renderer.debug.onShaderError =
+	( gl, program, vertexShader, fragmentShader ) => {
+    	    const vertexShaderSource = gl.getShaderSource( vertexShader );
+  	    const fragmentShaderSource = gl.getShaderSource( fragmentShader );
+	    const error = gl.getShaderInfoLog( fragmentShader );
+	    document.getElementById("editable-code-fct_error").value =
+		error;
+	    console.log( error );
+	};
+    settings.width  = canvas.width;
+    settings.height = canvas.height; 
+
+    const width  = canvas.width  || 2;
+    const height = canvas.height || 2;
+    effect = new AnaglyphEffect( renderer );
+    effect.setSize( width, height );
+
+    scene = new THREE.Scene();
+    const loader = new THREE.CubeTextureLoader();
+    loader.setPath( 'images/skybox/' );
+    textureCube = loader.load( [ 'posx.jpg', 'negx.jpg', 'posy.jpg', 'negy.jpg', 'posz.jpg', 'negz.jpg' ] );
+    scene.background = null;//textureCube;
+    
+    camera = new THREE.PerspectiveCamera( 60, canvas.width/canvas.height,
+					  0.01, 2000 );
+    camera.position.x = distance; // Math.cos( timer ) * distance;
+    camera.position.z = 0.0; // Math.sin( timer ) * distance;
+    camera.position.y = 0;
+    scene.add( camera );
+
+    uniforms = makeUniforms( settings ); 
+
+    shader = new THREE.MeshBasicMaterial( { color: 0x000000, } );
+    //    updateShader();
+    object = new THREE.Mesh( new THREE.BoxGeometry( 100, 100, 100 ), shader );
+    object.position.set( 0, 0, 0 );
+    scene.add( object );
+
+    updateShape( settings.shape );
+    
+    //
+    //document.body.appendChild( renderer.domElement );
+
+    //
+    window.addEventListener( 'resize', onWindowResize );
+    
+    //
+    controls = new OrbitControls( camera, renderer.domElement );
+    controls.enableDamping = true; 
+    controls.dampingFactor = 0.15;
+    controls.screenSpacePanning = false;
+    controls.minDistance = 1;
+    controls.maxDistance = distance;
+    // controls.maxPolarAngle = Math.PI / 2;
+    camera.lookAt( scene.position );
+
+}
+
+function onWindowResize() {
+    //camera.aspect = window.innerWidth / window.innerHeight;
+    canvas.width  = window.innerWidth;
+    canvas.height = canvas.width * 9 / 16;
+    camera.aspect = canvas.width / canvas.height;
+    camera.updateProjectionMatrix();
+    renderer.setSize( canvas.width, canvas.height );
+    effect.setSize( canvas.width, canvas.height );
+    uniforms.width.value  = canvas.width;
+    uniforms.height.value = canvas.height;    
+    //renderer.setSize( window.innerWidth, window.innerHeight );
+}
+
+//
+function animate() {
+    requestAnimationFrame( animate );
+    render();
+}
+
+function render() {
+    const now = Date.now() * 0.001;
+    const deltaTime = now - then;          // compute time since last frame
+    then = now;                            // remember time for next frame
+    const fps = 1 / deltaTime;             // compute frames per second
+    fpsElem.textContent = fps.toFixed(0);
+    
+    // camera.position.x = distance; // Math.cos( timer ) * distance;
+    // camera.position.z = 0.0; // Math.sin( timer ) * distance;
+    // camera.rotation.x += 0.01 * settings.rotation_x;
+    // camera.rotation.y += 0.01 * settings.rotation_y;
+    // camera.rotation.z += 0.01 * settings.rotation_z;
+    scene.traverse( function ( object ) {
+	if ( object.isMesh === true ) {
+	    object.rotation.x += 0.01 * settings.rotation_x;
+	    object.rotation.y += 0.01 * settings.rotation_y;
+	    object.rotation.z += 0.01 * settings.rotation_z;		  
+	}
+    } );
+    //settings.time = now;
+    //uniforms.time.value += deltaTime;
+    shader.uniforms.time.value += 0.01;
+    settings.camera_distance = camera.position.length();
+    shader.uniforms.camera_distance.value = settings.camera_distance;
+    if ( settings.anaglyph == 0 )
+	renderer.render( scene, camera );
+    else {
+	effect._stereo.eyeSep = settings.eye_sep;
+	effect.render( scene, camera );
+    }
+
+}
+
+function makeUniformColor( color ) {
+    return new THREE.Vector3( color[ 0 ], color[ 1 ], color[ 2 ] );
+}
+function makeUniforms( settings ) {
+    let uniforms = {
+	width           : { value : settings.width },
+	height          : { value : settings.height },	
+	bg_mode         : { value : settings.bg_mode },
+	bg_color        : { value : makeUniformColor( settings.bg_color ) },
+	ambient_color   : { value : new THREE.Vector3( 0.01, 0.0, 0.0 ) },
+	ext_diff_color  : { value : makeUniformColor( settings.ext_diff_color ) },
+	int_diff_color  : { value : makeUniformColor( settings.int_diff_color ) },
+	specular_color  : { value : new THREE.Vector3( 1.0, 1.0, 1.0 ) },
+	sing_color      : { value : new THREE.Vector3( 1.0, 1.0, 1.0 ) },	      
+	shininess       : { value: settings.shininess },
+	opacity         : { value: settings.opacity },
+	transparency    : { value: settings.transparency },
+	reflection      : { value: settings.reflection },
+	curv_scale      : { value: settings.curv_scale },
+	princ_curv      : { value: settings.princ_curv },
+	light1_color    : { value : new THREE.Vector3( 0.95, 0.8, 0.0 ) },
+	light1_direction: { value : new THREE.Vector3( 0.0, 1.0, 0.0 ) },
+	light2_color    : { value : new THREE.Vector3( 0.1, 0.1, 1.0 ) },
+	light2_direction: { value : new THREE.Vector3( 1.0, 0.0, 0.0 ) },
+	singularity     : { value: settings.singularity },
+	accuracy        : { value: settings.accuracy },	      
+	scale           : { value: settings.scale },
+	shape           : { value: settings.shape },
+	iso             : { value: settings.iso },
+	a               : { value: settings.a },
+	b               : { value: settings.b },
+	c               : { value: settings.c },
+	center_x        : { value: settings.center_x },
+	center_y        : { value: settings.center_y },
+	center_z        : { value: settings.center_z },	      	      
+	grid_size       : { value: settings.grid_size },
+	grid_thickness  : { value: settings.grid_thickness },
+	grid_attenuation: { value: settings.grid_attenuation },	      	      
+	display_mode    : { value: settings.display_mode },
+	color_model     : { value: settings.color_model },
+	grid_mode       : { value: settings.grid_mode },
+	time            : { value: settings.time },
+	camera_distance : { value: settings.camera_distance },
+	view_radius     : { value: settings.view_radius },
+	cubeMap         : { value: textureCube },
+	nb_bissections  : { value: settings.nb_bissections },
+	nb_reflections  : { value: settings.nb_reflections },
+	nb_refractions  : { value: settings.nb_refractions },
+	interior_index  : { value: settings.interior_index },
+	dir_color_on    : { value: makeUniformColor( settings.dir_color_on ) },
+	dir_color_off   : { value: makeUniformColor( settings.dir_color_off ) },
+	dir_on_opacity  : { value: settings.dir_on_opacity },
+	dir_off_opacity : { value: settings.dir_off_opacity }
+    };
+    return uniforms;
+}
+
+// Build a light from an integer (0-7)
+function makeLight( value ) {
+    switch ( value ) {
+    case 0:  return new THREE.Vector3( 1.0, 0.0, 0.0 );
+    case 1:  return new THREE.Vector3( 0.0, 1.0, 0.0 );
+    case 2:  return new THREE.Vector3( 0.0, 0.0, 1.0 );
+    case 3:  return new THREE.Vector3(-1.0, 0.0, 0.0 );
+    case 4:  return new THREE.Vector3( 0.0,-1.0, 0.0 );
+    case 5:  return new THREE.Vector3( 0.0, 0.0,-1.0 );
+    case 6:  return new THREE.Vector3( 1.0, 1.0,-1.0 );
+    case 7:  return new THREE.Vector3(-1.0,-1.0, 1.0 );
+    default: return new THREE.Vector3( 1.0, 0.0, 1.0 );
+    }
+}
+
+// Build a menu from a list of names
+function makeMenu( names ) {
+    let menu = {};
+    for ( var i = 0; i < names.length; i++ )
+	menu[ names[ i ] ] = i;
+    return menu;
+}
+</script>
+
+    
+  </body>
+</html>

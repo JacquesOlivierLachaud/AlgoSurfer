@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Info</title>
+    <meta charset="utf-8">
+  </head>
+  <body>
+    <textarea spellcheck="false" id="display-info" style="display: none;">
+    A real-time visualisation tool for implicit surfaces, i.e. isolevels
+    of real-value functions f(x,y,z). It casts rays through each
+    pixel and computes intersections with the surface.
+      - left-clicking on the shape with the mouse change the camera position.
+      - you can use `predefined shape` or write your custom
+        function (glsl, C-like) and press `View Surface`.
+      - you can change shape parameters (`a`,`b`,`c`) and use them in your
+        functions.
+      - you can change the viewed `isolevel` (default is 0).
+      - `scale` allows you to zoom in/out of the surface.
+      - `center_x`, `center_y`, `center_z` changes the center of view
+      - you may decrease `accuracy` to get better details, at the price
+        of increased computational burden (check fps above)
+      - `singularity` controls how singularity are detected, 1.0: large band
+        0.0: invisible.
+      - you may change the `color_model` to change the color display of
+        surfaces:
+        + `RGB`: color is the absolute value of the surface normal vector.
+        + `RGB+Grid`: same as above but add shaded lines depending on
+          the position (grid).
+        + `RGB+Spheres`: same as above but add shaded lines depending on
+          the position (spheres).
+        + `Phong`: color is an illmuniation model taking into account
+          colors and lights.
+        + `Phong+Grid`: same as above but add shaded lines depending on
+          the position (grid).
+        + `Phong+Spheres`: same as above but add shaded lines depending
+          on the position (spheres).
+        + `Phong+2-layers`: Phong illimunation but the first surface has
+          some transparency (see `opacity`), two surface sheets are displayed
+          at most.
+      - you may change the colors of the surface (diffuse inside/outside),
+        specular, singularities.
+      - you may change `lights` colors and directions.
+      - `view_shape` changes the volume that encloses the isosurface.
+      - `view_radius` changes the sizes of the previous volume.
+      - `grid_size`, `grid_thickness` and `grid_attenuation` changes the
+        display of overlayed grids/spheres.
+      - `rotation_x`, `rotation_y`, `rotation_z` changes the current object
+        rotation speed.
+      - `stop` stops the rotations.
+    </textarea>
+  </body>
+</html>  

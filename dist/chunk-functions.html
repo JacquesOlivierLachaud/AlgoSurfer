@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Functions</title>
+    <meta charset="utf-8">
+  </head>
+  <body>
+<!--
+///////////////////////////////////////////////////////////////////////////////
+// PREDEFINED SHAPES FRAGMENT SHADERS BEGIN
+///////////////////////////////////////////////////////////////////////////////
+-->
+    
+    <textarea spellcheck="false" id="frag-chunk-fct-durchball" style="display: none;">
+    // Computes f(x,y,z). You may use x2 for x*x, x3 for x*x*x,
+// same holds for y and z. Constant must be floating numbers.
+// Durckblick + ball
+return ( x2 + y2 + z2 - a*a ) * ( x3 * y + x * z3 + y3 * z + 5. * z );
+</textarea>
+    <textarea spellcheck="false" id="shape-durchball" style="display: none;">
+    { "name"           : "Durchball",
+      "frag"           : "durchball",
+      "display_mode"   : [ 0, 2, 5, 6, 7 ],
+      "color_model"    : [ 1, 2 ],
+      "a"              : [1.0, 1.5],
+      "scale"          : [15.0, 20.0],
+      "iso"            : [-0.8, 0.8],
+      "grid_size"      : [0.3, 0.4 ],
+      "grid_thickness" : [0.0, 0.1 ],
+      "curv_scale"     : [1.0, 2.0 ],
+      "princ_curv"     : [0,2]
+    }
+</textarea>
+    
+    <textarea spellcheck="false" id="frag-chunk-fct-crixxi" style="display: none;">
+    // Crixxi
+float d = y2 + z2 - a*a;
+float e = x2 + y2 - a*a;
+return 0.9*d*d + e*e*e;
+</textarea>
+    <textarea spellcheck="false" id="shape-crixxi" style="display: none;">
+    { "name"           : "Crixxi",
+      "frag"           : "crixxi",
+      "display_mode"   : [ 0, 2, 4, 6 ],
+      "color_model"    : [ 1, 2 ],
+      "a"              : [ 1.0, 1.0],
+      "scale"          : [30.0,30.0],
+      "iso"            : [-0.005, 0.005],
+      "curv_scale"     : [2.5, 2.5],
+      "grid_size"      : [0.1, 1.0],
+      "grid_thickness" : [0.0, 0.2],
+      "view_shape"     : [4]
+    }
+</textarea>
+    
+    <textarea spellcheck="false" id="frag-chunk-fct-cayleycubic" style="display: none;">
+    // CayleyCubic
+return x2 + y2 + z2 + x2*z - y2*z - 1.;
+</textarea>
+    <textarea spellcheck="false" id="shape-cayleycubic" style="display: none;">
+    { "name"           : "Cayley cubic",
+      "frag"           : "cayleycubic",
+      "display_mode"   : [ 0, 1, 6 ],
+      "color_model"    : [ 1, 2 ],
+      "scale"          : [10.0, 20.0],
+      "iso"            : [-0.1, 0.1],
+      "grid_size"      : [0.1, 1.0 ],
+      "grid_thickness" : [0.0, 0.1 ],
+      "view_shape"     : [4]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-durchblick" style="display: none;">	  
+    // Durchblick
+return x3 * y + x * z3 + y3 * z + a*z3 + 5. * z;
+</textarea>
+    <textarea spellcheck="false" id="shape-durchblick" style="display: none;">
+    { "name"           : "Durchblick",
+      "frag"           : "durchblick",
+      "display_mode"   : [ 2, 3, 5, 6, 7 ],
+      "color_model"    : [ 1, 2 ],
+      "a"              : [1.0, 1.5],
+      "scale"          : [15.0, 20.0],
+      "iso"            : [-0.1, 0.1],
+      "grid_size"      : [0.4, 0.5 ],
+      "grid_thickness" : [0.1, 0.1 ],
+      "princ_curv"     : [0,1,2],
+      "curv_scale"     : [1.0,1.0],
+      "view_shape"     : [4]
+    }
+</textarea>
+<!-- // [ 1, 6, 8, 9, 10, 11 ], -->
+    <textarea spellcheck="false" id="frag-chunk-fct-barthsextic" style="display: none;">
+    // BarthSextic
+float x4 = x2*x2; float y4 = y2*y2; float z4 = z2*z2;
+return z4*z2 + 5.*(x2+y2)*(-z4 + (x2+y2)*z2) - 2.*(x4 - 10.*x2*y2+5.*y4)*x*z
+    + 1.25*pow(a*(x2+y2+z2-a*a),2.0);
+</textarea>
+    <textarea spellcheck="false" id="shape-barthsextic" style="display: none;">
+    { "name"           : "Barth sextic",
+      "frag"           : "barthsextic",
+      "display_mode"   : [ 0, 1, 2, 6, 7 ],
+      "color_model"    : [ 0, 1 ],
+      "a"              : [1.0, 1.0],
+      "scale"          : [10.0, 20.0],
+      "iso"            : [-0.2, 0.2],
+      "grid_size"      : [0.0, 0.0 ],
+      "grid_thickness" : [0.0, 0.0 ],
+      "view_shape"     : [4]
+    }
+</textarea>
+    
+    <textarea spellcheck="false" id="frag-chunk-fct-clebschdcubic" style="display: none;">
+    // ClebschDCubic
+float d = x + y + z + a;
+return x3 + y3 + z3 + a*a*a - d*d*d;
+</textarea>
+    <textarea spellcheck="false" id="shape-clebschdcubic" style="display: none;">
+    { "name"           : "Clebsch diag. cubic",
+      "frag"           : "clebschdcubic",
+      "display_mode"   : [ 0, 1, 5, 6 ],
+      "color_model"    : [ 0, 1, 2 ],
+      "a"              : [1.0, 1.0],
+      "scale"          : [20.0, 30.0],
+      "iso"            : [-0.2, 0.2],
+      "grid_size"      : [0.35, 0.4 ],
+      "grid_thickness" : [0.0, 0.1 ]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-bohemiandome" style="display: none;">
+    // BohemianDome
+float d = x2 + y2 + z2 - a*a - b*b;
+return d*d - 4.*(a*a - x2)*(b*b - y2);
+</textarea>
+    <textarea spellcheck="false" id="shape-bohemiandome" style="display: none;">
+    { "name"           : "Bohemian dome",
+      "frag"           : "bohemiandome",
+      "display_mode"   : [ 0, 2, 3, 4, 6, 7 ],
+      "color_model"    : [ 1, 2 ],
+      "a"              : [0.8, 1.2],
+      "b"              : [0.8, 1.2],
+      "scale"          : [20.0, 23.0],
+      "iso"            : [-0.1, 0.1],
+      "curv_scale"     : [3.0, 3.0],
+      "grid_size"      : [0.0, 0.0 ],
+      "grid_thickness" : [0.0, 0.0 ]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-gyroid" style="display: none;">
+    // Gyroid
+return a*cos(x)*sin(y)+b*cos(y)*sin(z)+c*cos(z)*sin(x);
+</textarea>
+    <textarea spellcheck="false" id="shape-gyroid" style="display: none;">
+    { "name"           : "Gyroid",
+      "frag"           : "gyroid",
+      "display_mode"   : [ 0, 2, 3, 4, 5 ],
+      "color_model"    : [ 1, 2 ],
+      "a"              : [0.5, 1.5],
+      "b"              : [0.5, 1.5],
+      "c"              : [0.5, 1.5],
+      "scale"          : [14.0, 18.0],
+      "iso"            : [0.0, 0.0],
+      "curv_scale"     : [0.15, 0.15],
+      "princ_curv"     : [0,1,2],
+      "grid_size"      : [0.35, 0.4 ],
+      "grid_thickness" : [0.0, 0.1 ]
+    }
+</textarea>
+
+
+    <textarea spellcheck="false" id="frag-chunk-fct-neovius" style="display: none;">
+    // Neovius
+return 3.*a*(cos(x) + cos(y) + cos(z)) + 4.*b*cos(x)*cos(y)*cos(z);
+</textarea>
+    <textarea spellcheck="false" id="shape-neovius" style="display: none;">
+    { "name"           : "Neovius",
+      "frag"           : "neovius",
+      "display_mode"   : [ 0, 2, 3, 4, 5 ],
+      "color_model"    : [ 1, 2 ],
+      "a"              : [0.5, 1.5],
+      "b"              : [0.5, 1.5],
+      "scale"          : [6.0, 15.0],
+      "iso"            : [-1.0, 1.0],
+      "curv_scale"     : [1.0, 1.0],
+      "grid_size"      : [0.1, 1.0 ],
+      "grid_thickness" : [0.0, 0.1 ]
+    }
+</textarea>
+    
+    <textarea spellcheck="false" id="frag-chunk-fct-kleinbottle" style="display: none;">
+    // KleinBottle (Ian Stewart)
+float l2 = a*(x2+y2+z2);
+float w  = l2 - 2.0*y - b;
+return (l2 + 2.0*y - b)*(w*w - 8.0*z2) + 16.0*x*z*w;
+</textarea>
+    <textarea spellcheck="false" id="shape-kleinbottle" style="display: none;">
+    { "name"           : "Klein bottle",
+      "frag"           : "kleinbottle",
+      "display_mode"   : [ 5, 6, 7 ],
+      "color_model"    : [ 1, 2 ],
+      "a"              : [1.0, 1.0],
+      "scale"          : [10.0, 13.0],
+      "iso"            : [-0.1, 0.1],
+      "grid_size"      : [0.25, 0.25 ],
+      "grid_thickness" : [0.4, 0.5 ],
+      "princ_curv"     : [1,2],
+      "view_shape"     : [4]
+    }
+</textarea>
+
+
+    <textarea spellcheck="false" id="frag-chunk-fct-pluckerconoid" style="display: none;">
+    // PluckerConoid
+return z*pow( x2+y2, 2.5 ) - (x3*x2 - 10.0*x3*y2 + 5.0*x*y2*y2);
+</textarea>
+    <textarea spellcheck="false" id="shape-pluckerconoid" style="display: none;">
+    { "name"           : "Plucker conoid",
+      "frag"           : "pluckerconoid",
+      "display_mode"   : [ 0, 2, 3, 4, 5, 6, 7 ],
+      "color_model"    : [ 1, 2 ],
+      "a"              : [1.0, 1.0],
+      "scale"          : [15.0, 15.0],
+      "iso"            : [-0.01, 0.01],
+      "grid_size"      : [0.5, 0.5 ],
+      "grid_thickness" : [0.1, 0.1 ],
+      "princ_curv"     : [0,1,2],
+      "curv_scale"     : [0.25,0.25],
+      "view_shape"     : [4]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-ellipsoid" style="display: none;">
+    // Ellipsoid
+return (x2/(a*a)+y2/(b*b)+z2/(c*c)-1.);
+</textarea>
+    <textarea spellcheck="false" id="shape-ellipsoid" style="display: none;">
+    { "name" : "Ellipsoid",
+      "frag" : "ellipsoid",
+      "display_mode"   : [ 5 ],
+      "color_model"    : [ 0, 1 ],
+      "scale" : [24.0, 24.0],
+      "iso"   : [0.0, 0.0],
+      "a"     : [2.0, 2.0],
+      "b"     : [1.5, 1.5],
+      "c"     : [1.0, 1.0],
+      "grid_size" : [0.2,0.3],
+      "princ_curv": [0,1,2],
+      "curv_scale": [1.0,1.0]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-torus" style="display: none;">
+    // Torus
+return (x2+y2+z2+a*a-b*b)*(x2+y2+z2+a*a-b*b)-4.*a*a*(x2+y2);
+</textarea>
+    <textarea spellcheck="false" id="shape-torus" style="display: none;">
+    { "name" : "Torus",
+      "frag" : "torus",
+      "display_mode"   : [ 2, 3, 5, 6, 7 ],
+      "color_model"    : [ 1, 2 ],
+      "scale" : [10.0, 12.5],
+      "iso"   : [0.0, 0.0],
+      "a"     : [1.75, 2.0],
+      "b"     : [1.0, 1.5],
+      "princ_curv" : [0],
+      "grid_size" : [0.2,0.3],
+      "center_x" : [0.3,0.3],
+      "center_y" : [0.1,0.2],      
+      "center_z" : [-0.1,0.1],
+      "curv_scale" : [0.25,0.25],
+      "view_shape"     : [4]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-infinite-cubes" style="display: none;">
+    // Cubes in infinite directions
+float     d   = 0.5*a*b;
+return -0.25 + max( abs( mod( p.x, a ) - d ),
+		    max( abs( mod( p.y, a ) - d  ),
+	  		 abs( mod( p.z, a ) - d ) ) );
+</textarea>
+    <textarea spellcheck="false" id="shape-infinite-cubes" style="display: none;">
+    { "name" : "Infinite cubes",
+      "frag" : "infinite-cubes",
+      "display_mode"   : [ 0, 1 ],
+      "color_model"    : [ 1, 2 ],
+      "scale" : [5.0, 15.0],
+      "iso"   : [0.0, 0.0],
+      "a"     : [1.0, 1.0],
+      "b"     : [0.2, 1.8],
+      "view_shape" : [0]
+    }
+</textarea>
+
+
+    <textarea spellcheck="false" id="frag-chunk-fct-kleinian" style="display: none;">
+    // Kleinian variation (taken from shadertoy (Spudsville2018, by EvilRyu)
+const int depth = 8; //< depth of the fractal ! Increase at your own risk...
+vec3 d = vec3( a, b, c ); //< Try (1,0.225,1.15) 
+float scale = 1.0;
+for( int i = 0; i < depth; i++)
+{
+    p        = 2.0*clamp(p, -d, d) - p;
+    float r2 = dot(p,p);
+    float k  = max((1.)/(r2), 0.03);
+    p       *= k;
+    scale   *= k;
+}
+float l   = length(p.xy);
+float rxy = l - 3.;
+float n   = l * p.z;
+rxy = max(rxy, -(n) / (length(p))-0.02);
+return (rxy) / abs(scale) + 0.0001; //thicken a little bit
+</textarea>
+    <textarea spellcheck="false" id="shape-kleinian" style="display: none;">
+    { "name"        : "Kleinian variation",
+      "frag"        : "kleinian",
+      "display_mode"   : [ 0, 2 ],
+      "color_model"    : [ 1 ],
+      "scale"       : [10.0, 35.0],
+      "iso"         : [0.0, 0.0],
+      "abc"         : [ [0.475, 0.425, 1.15], [1.0, 0.2, 1.25] ],
+      "curv_scale"  : [50.0, 50.0],
+      "grid_thickness" : [0.0, 0.0 ]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-virus" style="display: none;">
+      // Kind of virus
+const vec3 xc = vec3(0.,0.,0.);
+vec3  d       = vec3(x,y,z) - xc;
+vec3  n       = normalize( d );
+vec2  theta   = normalize (d.xy);
+float dd      = length( n.xy );
+float tt      = atan( theta.y, theta.x );
+float phi     = atan( n.z, dd );
+const float nbu = 22.;
+const float nbv = 26.;
+float u       = pow(cos( tt * nbu ), 9.0);
+float v       = pow(cos( phi * nbv ), 9.0);
+float d2      = dot(d,d);
+return d2-a*a - 0.2*u*v/(1.+1.*d2);
+    </textarea>
+    <textarea spellcheck="false" id="shape-virus" style="display: none;">
+    { "name"  : "Virus",
+      "frag"  : "virus",
+      "display_mode"   : [ 0, 6 ],
+      "color_model"    : [ 1, 2 ],
+      "a"     : [1.0,1.0],
+      "b"     : [1.0,1.0],
+      "c"     : [1.0,1.0],
+      "scale" : [30.0,35.0],
+      "iso"   : [-1.0, 1.0],
+      "view_shape" : [4]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-whitney-umbrella" style="display: none;">
+    // Whitney umbrella
+return x2 - y2*z;
+</textarea>
+    <textarea spellcheck="false" id="shape-whitney-umbrella" style="display: none;">
+    { "name"  : "Whitney umbrella",
+      "frag"  : "whitney-umbrella",
+      "display_mode"   : [ 0, 6, 7 ],
+      "color_model"    : [ 1, 2 ],
+      "scale" : [10.0,20.0],
+      "iso"   : [0.0, 0.01]
+    }
+</textarea>
+    
+    <textarea spellcheck="false" id="frag-chunk-fct-sierpinski-cube" style="display: none;">
+    // Sierpinski's cube / fractal
+const int n = 4; // depth of Sierpinski's cube (increase for less volume)
+float l = 3.0 * a;
+float d = max( max( x - l, -l - x ),
+               max( max( y - l, -l - y ), max( z - l, -l - z ) ) );
+vec3  c = vec3( 0., 0., 0. );
+for ( int i = 0; i < n && d < 0.; i++ )
+  {
+    l /= 3.0;
+    float dx = abs(x - c.x);
+    float dy = abs(y - c.y);
+    float dz = abs(z - c.z);
+    float ax = max( dy, dz );
+    float ay = max( dx, dz );
+    float az = max( dx, dy );
+    float dp = min( ax, min( ay, az ) );
+    float nd = l - dp;
+    d = max( d, nd );
+    float ll = 2.0*l;
+    c.x += ll*round( (x - c.x) / ll );
+    c.y += ll*round( (y - c.y) / ll );
+    c.z += ll*round( (z - c.z) / ll );
+  }
+return d;
+</textarea>
+    <textarea spellcheck="false" id="shape-sierpinski-cube" style="display: none;">
+    { "name" : "Sierpinski's cube",
+      "frag" : "sierpinski-cube",
+      "display_mode"   : [ 0, 6 ],
+      "color_model"    : [ 1 ],
+      "scale" : [10.0, 10.0],
+      "accuracy" : 2.0,
+      "iso"   : [0.0, 0.0]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-goursat-tetra" style="display: none;">
+    // Goursat surface (quartic) with tetrahedral symmetry.
+return (x+y+z-a)*(-x-y+z-a)*(x-y-z-a)*(-x+y-z-a)+b*(x2+y2+z2-3.*a)*(x2+y2+z2-3.*a);
+</textarea>
+    <textarea spellcheck="false" id="shape-goursat-tetra" style="display: none;">
+    { "name"  : "Goursat tetra",
+      "frag"  : "goursat-tetra",
+      "display_mode"   : [ 0, 1, 2, 5, 6 ],
+      "color_model"    : [ 1, 2 ],
+      "scale" : [10.0,14.0],
+      "a"     : [0.5,1.0],
+      "b"     : [0.5,1.0],
+      "iso"   : [-0.1, 0.1],
+      "curv_scale"  : [1.0, 1.0],
+      "grid_size" : [0.05, 0.5 ],
+      "grid_thickness" : [0.1, 0.1 ]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-goursat-octa" style="display: none;">
+    // Goursat surface (quartic) with octahedral/cube symmetry.
+return x2*x2+y2*y2+z2*z2+a*(x2+y2+z2)*(x2+y2+z2)+b*(x2+y2+z2)+c;
+</textarea>
+    <textarea spellcheck="false" id="shape-goursat-octa" style="display: none;">
+    { "name"  : "Goursat octa",
+      "frag"  : "goursat-octa",
+      "display_mode"   : [ 0, 1, 2, 5, 6 ],
+      "color_model"    : [ 1, 2 ],
+      "scale" : [15.0,20.0],
+      "abc"   : [ [0.0,-1.0,0.0], [-1.0,-0.25,0.25], [-1.0,1.0,1.0], [0.0,-2.0,2.0],
+		  [-1.0,4.0,6.0], [-0.5,-1.0,0.5], [-0.075, -1.5, 1.3] ],
+      "iso"   : [-0.01, 0.01],
+      "curv_scale"  : [3.0, 3.0],
+      "grid_thickness" : [0.1, 0.1 ],
+      "grid_size"      : [0.25, 0.35 ],
+      "princ_curv"     : [0,1,2]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-julia" style="display: none;">
+    // Julia set
+const int n = 30; //< max iterations
+float cx = a;
+float cy = b;
+float zx = y;
+float zy = z;
+int i = 0;
+for ( i = 0; i < n; i++ ){
+    vec2 nz = vec2( zx*zx - zy*zy + cx, 2.0*zx*zy + cy );
+    zx = nz.x; zy = nz.y;
+    // we know that the series is divergent when |z| > 2.0
+   if ( dot(nz,nz) > 4.0 ) break; 
+}
+return(2.0/(zx*zx+zy*zy)*float(i)/29.0) - 1.*(1.0-10.1*abs(x));
+</textarea>
+    <textarea spellcheck="false" id="shape-julia" style="display: none;">
+    { "name"           : "Julia set",
+      "frag"           : "julia",
+      "display_mode"   : [ 0 ],
+      "color_model"    : [ 1 ],
+      "a"              : [-0.5, 0.5],
+      "b"              : [-0.5, 0.5],
+      "scale"          : [33.0, 40.0],
+      "iso"            : [0.0, 0.0],
+      "view_shape"     : [ 4,7 ],
+      "animate_a"      : [ 4.0, 0.3 ],
+      "animate_b"      : [ 2.0, 0.2 ]
+    }
+</textarea>
+
+    <textarea spellcheck="false" id="frag-chunk-fct-beating-heart" style="display: none;">
+    // Beating heart
+const float amp = 0.2;
+float ft = -abs(cos(3.*t));
+float ax = z*(1.+amp*ft);
+float ay = x*(1.+amp*ft);
+float az = y*(1.+amp*ft);
+float ax2 = ax*ax;
+float ax3 = ax*ax2;
+float ay2 = ay*ay;
+float ay3 = ay*ay2;
+float az2 = az*az;
+float az3 = az*az2;
+float w = ax2+9./4.*ay2+az2-1.;
+return (w*w*w - ax2*az3 - 9./80.*ay2*az3);  
+</textarea>
+    <textarea spellcheck="false" id="shape-beating-heart" style="display: none;">
+    { "name"           : "Beating heart",
+      "frag"           : "beating-heart",
+      "display_mode"   : [ 0, 2, 6 ],
+      "color_model"    : [ 1 ],
+      "scale"          : [25.0, 25.0],
+      "iso"            : [0.0, 0.0],
+      "view_shape"     : [ 4 ],
+      "grid_size"      : [1.0,1.0],
+      "grid_thickness" : [0.0,0.0],
+      "singularity"    : 0.0
+    }
+</textarea>
+
+
+    <!--
+///////////////////////////////////////////////////////////////////////////////
+// PREDEFINED SHAPES FRAGMENT SHADERS END
+///////////////////////////////////////////////////////////////////////////////
+-->
+  </body>
+</html>  

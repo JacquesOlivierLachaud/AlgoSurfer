@@ -1,0 +1,97 @@
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <title>AlgoSurfer demo</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <link type="text/css" rel="stylesheet" href="mcanvas.css">
+    </head>
+
+    <!--
+AlgoSurfer, (c) 2024 by Jacques-Olivier Lachaud, v1.0
+
+As part of a pedagogical project, do not expect clean javascript code. The focus was on displaying implicit surfaces with a massive use of GPU computations. 
+    -->
+
+    <body>
+    <div class="titlebox"><a href="shaders-implicit-surface-viewer.html" style="color:#ffd;">AlgoSurfer</a></div>
+    <div class="subtitlebox">a simple implicit/algebraic surface viewer</div>
+    <div class="mtextbox">Choose a predefined shape, or enter your own function to display it, navigate with the mouse</div>
+    <div class="wrapper">
+    <div class="box first">
+    <canvas id="webglcanvas0" style="border: none; backgrobg-lund-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle0"></div>
+    </div>
+    <div class="box second">
+    <canvas id="webglcanvas1" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle1"></div>
+    </div>
+    <div class="box third">
+    <canvas id="webglcanvas2" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle2"></div>
+    </div>    
+    <div class="box fourth">
+    <canvas id="webglcanvas3" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle3"></div>
+    </div>
+    <div class="box fifth">
+    <canvas id="webglcanvas4" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle4"></div>
+    </div>
+    <div class="box sixth">
+    <canvas id="webglcanvas5" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle5"></div>
+    </div>            
+    <div class="box seventh">
+    <canvas id="webglcanvas6" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle6"></div>
+    </div>
+    <div class="box eighth">
+    <canvas id="webglcanvas7" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle7"></div>
+    </div>
+    <div class="box ninth">
+    <canvas id="webglcanvas8" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle8"></div>
+    </div>
+    <div class="box tenth">
+    <canvas id="webglcanvas9" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle9"></div>
+    </div>
+    <div class="box eleventh">
+    <canvas id="webglcanvas10" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle10"></div>
+    </div>
+    <div class="box twelfth">
+    <canvas id="webglcanvas11" style="border: none; background-color:#000000" width="200" height="200"></canvas>
+    <div class="mbox" id="subtitle11"></div>
+    </div>
+    </div>
+
+    <!--
+Contains the glsl code for functions used in the fragment shader,
+as well as their properties.
+    -->
+    <iframe id="imported-functions" title="function code definitions" src="./chunk-functions.html" width="0" height="0" style="border: none; background-color:#000000"></iframe>
+
+    <!--
+Contains the glsl code for the vertex and fragment shaders.
+    -->
+    <iframe id="imported-shaders" title="shaders code definitions" src="./chunk-shaders-reorg.html" width="0" height="0" style="border: none; background-color:#000000"></iframe>
+
+    <script type="importmap">
+      {
+	  "imports": {
+	      "three": "./three.module.js",
+	      "three/addons/": "./jsm/"
+	  }
+      }
+    </script>
+
+
+    <script type="module" src="algosurfer-demo.js"></script>
+
+
+</body>
+    </html>
+    
